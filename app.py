@@ -406,20 +406,20 @@ B-roll prompt: {esc(scene.get("broll_prompt", ""))}</div>""", unsafe_allow_html=
                 use_container_width=True,
             )
 
-            render_mp4 = st.button("Render MP4 Reel", use_container_width=True)
+            render_mp4 = st.button("Render MP4 Reel with Voiceover", use_container_width=True)
             if render_mp4:
                 try:
-                    with st.spinner("Rendering vertical MP4 reel from generated scenes and subtitles..."):
+                    with st.spinner("Rendering vertical MP4 reel with generated voiceover audio..."):
                         st.session_state.reel_mp4 = generate_reel_mp4(package)
                         add_agent_log("Video Rendering Agent exported downloadable MP4")
-                    st.success("MP4 reel rendered.")
+                    st.success("MP4 reel with voiceover rendered.")
                 except RuntimeError as error:
                     st.error(str(error))
 
             if "reel_mp4" in st.session_state:
                 st.video(st.session_state.reel_mp4)
                 st.download_button(
-                    "Download Reel as MP4",
+                    "Download Instagram Reel MP4 with Voice",
                     data=st.session_state.reel_mp4,
                     file_name="ratefluencer_ai_reel.mp4",
                     mime="video/mp4",
