@@ -33,7 +33,7 @@ The project focuses on:
 - **Trend Ranking Engine**: Assigns trend score, growth proxy, source, and confidence signals.
 - **AI Reel Generator**: Produces a 30-60 second reel package based on the selected topic.
 - **Video Preview**: Shows an animated vertical reel-style preview inside the app.
-- **MP4 Export**: Renders the generated scene plan into a downloadable vertical MP4 reel with subtitles.
+- **MP4 Export**: Renders the generated scene plan into a downloadable vertical MP4 reel with subtitles and Windows text-to-speech voiceover.
 - **Voiceover and Subtitles**: Generates text-to-speech ready voiceover and matching subtitle lines.
 - **Visual Asset Planning**: Creates scene-by-scene visuals, thumbnail prompt, and B-roll prompts.
 - **Publishing Copy**: Generates Instagram caption, hashtags, and LinkedIn post.
@@ -50,7 +50,7 @@ The project focuses on:
 - LLaMA 3.3 70B configurable through environment variables
 - NewsAPI for trend discovery
 - HTML/CSS animation for the reel preview
-- PIL, NumPy, ImageIO, and FFmpeg for MP4 rendering
+- PIL, NumPy, ImageIO, FFmpeg, and Windows text-to-speech for MP4 rendering with voiceover
 
 ## Project Structure
 
@@ -131,8 +131,8 @@ Without this key, the app clearly shows that live trend data is unavailable and 
    - LinkedIn post
    - Virality score
 8. Download the reel package JSON.
-9. Click **Render MP4 Reel**.
-10. Preview and download the generated `.mp4` file.
+9. Click **Render MP4 Reel with Voiceover**.
+10. Preview and download the generated Instagram Reel `.mp4` file with voice.
 
 ## AI Workflow
 
@@ -212,7 +212,7 @@ The app also estimates:
 5. Click **Generate AI Reel**.
 6. Show the animated vertical reel preview.
 7. Walk through the generated scenes, voiceover, subtitles, thumbnail prompt, and B-roll prompts.
-8. Click **Render MP4 Reel** and download the video file.
+8. Click **Render MP4 Reel with Voiceover** and download the video file.
 9. Show Instagram and LinkedIn publishing copy.
 10. Open **Virality Lab** and explain predicted views, likes, shares, saves, and virality score.
 11. Save sample feedback to demonstrate the learning loop.
@@ -221,11 +221,11 @@ The app also estimates:
 
 ## Notes
 
-This prototype generates a complete AI reel production package, animated preview, and downloadable MP4 video. The MP4 is rendered from the generated scene plan and subtitles. The generated B-roll prompts, voiceover script, subtitle lines, and thumbnail prompt can also be passed into video, voice, and image generation tools such as Runway, Veo, ElevenLabs, or other media APIs.
+This prototype generates a complete AI reel production package, animated preview, and downloadable MP4 video with voiceover. The MP4 is rendered from the generated scene plan, subtitles, and Windows text-to-speech audio. The generated B-roll prompts, voiceover script, subtitle lines, and thumbnail prompt can also be passed into video, voice, and image generation tools such as Runway, Veo, ElevenLabs, or other media APIs.
 
 ## Future Enhancements
 
-- Text-to-speech voiceover export
+- Premium AI voice options through ElevenLabs, OpenAI TTS, or similar providers
 - Auto-generated subtitle files
 - AI thumbnail image generation
 - Direct publishing scheduler
