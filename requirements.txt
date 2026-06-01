@@ -1,0 +1,8 @@
+streamlit
+requests
+python-dotenv
+groq
+pillow
+numpy
+imageio
+imageio-ffmpeg
