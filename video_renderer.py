@@ -1,14 +1,17 @@
 import hashlib
 import math
+import subprocess
 import tempfile
 from pathlib import Path
 
 try:
     import imageio.v2 as imageio
+    import imageio_ffmpeg
     import numpy as np
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
     imageio = None
+    imageio_ffmpeg = None
     np = None
     Image = None
     ImageDraw = None
@@ -21,18 +24,20 @@ FPS = 12
 
 
 def _ensure_video_dependencies():
-    global imageio, np, Image, ImageDraw, ImageFont
-    if imageio is not None and np is not None and Image is not None:
+    global imageio, imageio_ffmpeg, np, Image, ImageDraw, ImageFont
+    if imageio is not None and imageio_ffmpeg is not None and np is not None and Image is not None:
         return
 
     try:
         import imageio.v2 as imageio_import
+        import imageio_ffmpeg as imageio_ffmpeg_import
         import numpy as np_import
         from PIL import Image as PILImage, ImageDraw as PILImageDraw, ImageFont as PILImageFont
     except ImportError as exc:
         raise RuntimeError("MP4 rendering dependencies are missing. Run pip install -r requirements.txt and restart Streamlit.") from exc
 
     imageio = imageio_import
+    imageio_ffmpeg = imageio_ffmpeg_import
     np = np_import
     Image = PILImage
     ImageDraw = PILImageDraw
@@ -183,6 +188,97 @@ def _render_scene_frame(package, scene, scene_index, frame_index, total_frames):
     return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
 
 
+def _voiceover_text(package):
+    text = str(package.get("voiceover_script") or "").strip()
+    if text:
+        return text
+    return " ".join(str(scene.get("voiceover", "")).strip() for scene in package.get("scenes", []) if scene.get("voiceover")).strip()
+
+
+def _synthesize_voiceover_wav(text, wav_path):
+    if not text:
+        return False
+
+    with tempfile.NamedTemporaryFile(suffix=".txt", mode="w", encoding="utf-8", delete=False) as text_file:
+        text_file.write(text)
+        text_path = Path(text_file.name)
+
+    with tempfile.NamedTemporaryFile(suffix=".ps1", mode="w", encoding="utf-8", delete=False) as script_file:
+        script_file.write(r"""
+param(
+    [string]$TextPath,
+    [string]$WavPath
+)
+Add-Type -AssemblyName System.Speech
+$text = Get-Content -LiteralPath $TextPath -Raw
+$speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$speaker.Rate = 1
+$speaker.Volume = 100
+$speaker.SetOutputToWaveFile($WavPath)
+$speaker.Speak($text)
+$speaker.Dispose()
+""".strip())
+        script_path = Path(script_file.name)
+
+    try:
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(script_path),
+                "-TextPath",
+                str(text_path),
+                "-WavPath",
+                str(wav_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        return result.returncode == 0 and Path(wav_path).exists() and Path(wav_path).stat().st_size > 0
+    finally:
+        for path in [text_path, script_path]:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def _mux_audio(video_path, wav_path, output_path):
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    result = subprocess.run(
+        [
+            ffmpeg_path,
+            "-y",
+            "-i",
+            str(video_path),
+            "-i",
+            str(wav_path),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "160k",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("Could not merge voiceover audio into the MP4. Please try rendering again.")
+
+
 def generate_reel_mp4(package):
     _ensure_video_dependencies()
 
@@ -191,10 +287,14 @@ def generate_reel_mp4(package):
         raise ValueError("No scenes available to render.")
 
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        silent_video_path = Path(tmp.name)
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        wav_path = Path(tmp.name)
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
         output_path = Path(tmp.name)
 
     try:
-        with imageio.get_writer(output_path, fps=FPS, codec="libx264", quality=8, macro_block_size=16) as writer:
+        with imageio.get_writer(silent_video_path, fps=FPS, codec="libx264", quality=8, macro_block_size=16) as writer:
             for scene_index, scene in enumerate(scenes[:6]):
                 duration = _scene_duration_seconds(scene)
                 total_frames = max(1, int(duration * FPS))
@@ -202,11 +302,18 @@ def generate_reel_mp4(package):
                     frame = _render_scene_frame(package, scene, scene_index, frame_index, total_frames)
                     writer.append_data(np.asarray(frame))
 
-        data = output_path.read_bytes()
+        voice_text = _voiceover_text(package)
+        has_voice = _synthesize_voiceover_wav(voice_text, wav_path)
+        if has_voice:
+            _mux_audio(silent_video_path, wav_path, output_path)
+            data = output_path.read_bytes()
+        else:
+            data = silent_video_path.read_bytes()
     finally:
-        try:
-            output_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        for path in [silent_video_path, wav_path, output_path]:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     return data
